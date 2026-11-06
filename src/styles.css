@@ -162,6 +162,27 @@
   .sheet-input:focus { box-shadow: inset 0 0 0 2px var(--primary); }
 }
 .sheet-group th, .sheet-group td { background: var(--accent); font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+@media screen and (max-width: 767px) {
+  .sheet { width: 100%; table-layout: fixed; font-size: 0.875rem; }
+  .sheet-label { position: static; min-width: 0; width: 55%; white-space: normal; padding: 0.625rem 0.75rem; }
+  .sheet-head { min-width: 0; }
+  .sheet-cell { min-width: 0; height: 3rem; }
+  .sheet-input { min-width: 0; font-size: 1rem; padding: 0 0.75rem; }
+  .sheet tr > :not(:first-child) { display: none; }
+  .sheet[data-month="0"] tr > :nth-child(2),
+  .sheet[data-month="1"] tr > :nth-child(3),
+  .sheet[data-month="2"] tr > :nth-child(4),
+  .sheet[data-month="3"] tr > :nth-child(5),
+  .sheet[data-month="4"] tr > :nth-child(6),
+  .sheet[data-month="5"] tr > :nth-child(7),
+  .sheet[data-month="6"] tr > :nth-child(8),
+  .sheet[data-month="7"] tr > :nth-child(9),
+  .sheet[data-month="8"] tr > :nth-child(10),
+  .sheet[data-month="9"] tr > :nth-child(11),
+  .sheet[data-month="10"] tr > :nth-child(12),
+  .sheet[data-month="11"] tr > :nth-child(13) { display: table-cell; }
+  .sheet-group th { height: 2.75rem; }
+}
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
   .sheet { font-size: 7pt; }

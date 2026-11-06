@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, FileDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -71,8 +73,10 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2,
 function Index() {
   const [data, setData] = useState<Data>(SEED);
   const [loaded, setLoaded] = useState(false);
+  const [month, setMonth] = useState(0);
 
   useEffect(() => {
+    setMonth(new Date().getMonth());
     const raw = localStorage.getItem(KEY);
     if (raw) setData(JSON.parse(raw));
     setLoaded(true);
@@ -104,21 +108,10 @@ function Index() {
       </tr>
     ));
 
-  const section = (title: string) => (
-    <tr>
-      <th className="sheet-label text-section font-semibold">{title}</th>
-      {MONTHS.map((_, m) => (
-        <td key={m} className="sheet-cell px-2 text-section font-semibold">{title}</td>
-      ))}
-    </tr>
-  );
-
-  const now = new Date().getMonth();
-
   const group = (title: string, cls = "") => (
     <tr className="sheet-group">
       <th className={`sheet-label ${cls}`}>{title}</th>
-      <td colSpan={12} className="sheet-cell" />
+      {MONTHS.map((name) => <td key={name} className="sheet-cell" />)}
     </tr>
   );
   const computed = (label: string, fn: (m: number) => number, cls = "") => (
@@ -133,39 +126,47 @@ function Index() {
 
   return (
     <main className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card px-6 py-4 flex flex-wrap items-center justify-between gap-4 print:border-0">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded bg-primary text-primary-foreground grid place-items-center font-bold">R$</div>
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">Minhas Contas</h1>
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-card px-4 py-4 sm:px-6 print:border-0">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="h-9 w-9 shrink-0 rounded bg-primary text-primary-foreground grid place-items-center font-bold">R$</div>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold text-foreground">Minhas Contas</h1>
             <p className="text-xs text-muted-foreground print:hidden">Salvo automaticamente neste navegador</p>
           </div>
         </div>
-        <button onClick={() => window.print()} className="print:hidden rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-          Exportar PDF
-        </button>
+        <Button onClick={() => window.print()} aria-label="Exportar PDF" title="Exportar PDF" className="h-11 shrink-0 px-3 print:hidden">
+          <FileDown aria-hidden="true" /><span className="hidden sm:inline">Exportar</span> PDF
+        </Button>
       </header>
 
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4">
+      <nav aria-label="Escolher mês" className="grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3 px-4 pt-4 sm:max-w-sm print:hidden">
+        <Button variant="outline" size="icon" className="h-11 w-11" aria-label="Mês anterior" title="Mês anterior" disabled={month === 0} onClick={() => setMonth((m) => m - 1)}><ChevronLeft /></Button>
+        <select aria-label="Mês" value={month} onChange={(e) => setMonth(Number(e.target.value))} className="h-11 min-w-0 rounded-md border border-input bg-card px-3 text-base font-semibold capitalize text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {MONTHS.map((name, index) => <option key={name} value={index}>{name}</option>)}
+        </select>
+        <Button variant="outline" size="icon" className="h-11 w-11" aria-label="Próximo mês" title="Próximo mês" disabled={month === 11} onClick={() => setMonth((m) => m + 1)}><ChevronRight /></Button>
+      </nav>
+
+      <section className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
         {[
-          ["Entradas", income(now), "text-primary"],
-          ["Gasto total", total(now), "text-section"],
-          ["Saldo", income(now) - total(now), "text-foreground"],
+          ["Entradas", income(month), "text-primary"],
+          ["Gasto total", total(month), "text-section"],
+          ["Saldo", income(month) - total(month), "text-foreground"],
         ].map(([l, v, c]) => (
-          <div key={l as string} className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{l} · {MONTHS[now]}</p>
-            <p className={`mt-1 text-2xl font-semibold ${c}`}>R$ {fmt(v as number)}</p>
+          <div key={l as string} className={`min-w-0 rounded-md border border-border bg-card p-3 sm:p-4 ${l === "Saldo" ? "col-span-2 sm:col-span-1" : ""}`}>
+            <p className="text-xs text-muted-foreground">{l} · {MONTHS[month]}</p>
+            <p className={`mt-1 break-words text-xl sm:text-2xl font-semibold ${c}`}>R$ {fmt(v as number)}</p>
           </div>
         ))}
       </section>
 
       <div className="overflow-auto px-4 pb-8 print:overflow-visible">
-        <table className="sheet">
+        <table className="sheet" data-month={month}>
           <thead>
             <tr>
               <th className="sheet-label sheet-head">Conta</th>
               {MONTHS.map((m, i) => (
-                <th key={m} className={`sheet-head capitalize ${i === now ? "bg-accent" : ""}`}>{m}</th>
+                <th key={m} className={`sheet-head capitalize ${i === month ? "bg-accent" : ""}`}>{m}</th>
               ))}
             </tr>
           </thead>

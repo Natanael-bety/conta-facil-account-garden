@@ -21,6 +21,7 @@ type Row = { id: string; label: string };
 const EU_INCOME: Row[] = [
   { id: "salario", label: "salário" },
   { id: "caixa", label: "caixa nu" },
+  { id: "entrada", label: "valor de entrada" },
   { id: "lanche", label: "Lanche" },
 ];
 const EU_COSTS: Row[] = [
@@ -114,45 +115,71 @@ function Index() {
 
   const now = new Date().getMonth();
 
+  const group = (title: string, cls = "") => (
+    <tr className="sheet-group">
+      <th className={`sheet-label ${cls}`}>{title}</th>
+      <td colSpan={12} className="sheet-cell" />
+    </tr>
+  );
+  const computed = (label: string, fn: (m: number) => number, cls = "") => (
+    <tr className="bg-muted">
+      <th className={`sheet-label bg-muted font-semibold ${cls}`}>{label}</th>
+      {MONTHS.map((_, m) => {
+        const v = fn(m);
+        return <td key={m} className={`sheet-cell px-2 text-right font-semibold ${cls} ${v < 0 ? "text-section" : ""}`}>{v ? fmt(v) : ""}</td>;
+      })}
+    </tr>
+  );
+
   return (
     <main className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <header className="border-b border-border bg-card px-6 py-4 flex flex-wrap items-center justify-between gap-4 print:border-0">
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded bg-primary text-primary-foreground grid place-items-center font-bold">₢</div>
+          <div className="h-9 w-9 rounded bg-primary text-primary-foreground grid place-items-center font-bold">R$</div>
           <div>
             <h1 className="text-lg font-semibold text-foreground">Minhas Contas</h1>
-            <p className="text-xs text-muted-foreground">Página1 · salvo automaticamente neste navegador</p>
+            <p className="text-xs text-muted-foreground print:hidden">Salvo automaticamente neste navegador</p>
           </div>
         </div>
-        <div className="flex gap-6 text-sm">
-          <div><p className="text-muted-foreground">Entradas ({MONTHS[now]})</p><p className="font-semibold text-primary">R$ {fmt(income(now))}</p></div>
-          <div><p className="text-muted-foreground">Gasto total</p><p className="font-semibold text-section">R$ {fmt(total(now))}</p></div>
-          <div><p className="text-muted-foreground">Saldo</p><p className="font-semibold text-foreground">R$ {fmt(income(now) - total(now))}</p></div>
-        </div>
+        <button onClick={() => window.print()} className="print:hidden rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          Exportar PDF
+        </button>
       </header>
 
-      <div className="overflow-auto p-4">
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4">
+        {[
+          ["Entradas", income(now), "text-primary"],
+          ["Gasto total", total(now), "text-section"],
+          ["Saldo", income(now) - total(now), "text-foreground"],
+        ].map(([l, v, c]) => (
+          <div key={l as string} className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">{l} · {MONTHS[now]}</p>
+            <p className={`mt-1 text-2xl font-semibold ${c}`}>R$ {fmt(v as number)}</p>
+          </div>
+        ))}
+      </section>
+
+      <div className="overflow-auto px-4 pb-8 print:overflow-visible">
         <table className="sheet">
           <thead>
             <tr>
-              <th className="sheet-label text-section">EU</th>
+              <th className="sheet-label sheet-head">Conta</th>
               {MONTHS.map((m, i) => (
-                <th key={m} className={`sheet-head ${i === now ? "bg-accent" : ""}`}>{m}</th>
+                <th key={m} className={`sheet-head capitalize ${i === now ? "bg-accent" : ""}`}>{m}</th>
               ))}
             </tr>
           </thead>
           <tbody>
+            {group("EU — Entradas", "text-primary")}
             {renderRows(EU_INCOME)}
+            {computed("total entradas", income, "text-primary")}
+            {group("EU — Gastos", "text-section")}
             {renderRows(EU_COSTS)}
-            <tr className="bg-muted">
-              <th className="sheet-label font-semibold">gasto total</th>
-              {MONTHS.map((_, m) => (
-                <td key={m} className="sheet-cell px-2 text-right font-semibold">{total(m) ? fmt(total(m)) : ""}</td>
-              ))}
-            </tr>
-            {section("EMPRESA")}
+            {computed("gasto total", total)}
+            {computed("saldo", (m) => income(m) - total(m))}
+            {group("EMPRESA", "text-section")}
             {renderRows(EMPRESA)}
-            <tr><td colSpan={13} className="h-6" /></tr>
+            {group("Outros")}
             {renderRows(OUTROS)}
           </tbody>
         </table>

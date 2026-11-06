@@ -142,3 +142,22 @@
     color: var(--color-foreground);
   }
 }
+
+:root {
+  --background: oklch(0.975 0.004 150);
+  --primary: oklch(0.5 0.13 150);
+  --primary-foreground: oklch(0.99 0 0);
+  --accent: oklch(0.93 0.05 150);
+  --muted: oklch(0.955 0.01 150);
+  --section: oklch(0.58 0.22 27);
+}
+@theme inline { --color-section: var(--section); }
+
+@layer components {
+  .sheet { border-collapse: collapse; font-size: 0.8rem; background: var(--card); min-width: 100%; }
+  .sheet-label, .sheet-head, .sheet-cell { border: 1px solid var(--border); height: 1.9rem; white-space: nowrap; }
+  .sheet-label { text-align: left; padding: 0 0.5rem; font-weight: 400; min-width: 9rem; position: sticky; left: 0; background: var(--card); z-index: 1; }
+  .sheet-head { text-align: left; padding: 0 0.5rem; font-weight: 500; min-width: 6.5rem; color: var(--muted-foreground); }
+  .sheet-input { width: 100%; height: 100%; padding: 0 0.5rem; text-align: right; background: transparent; outline: none; }
+  .sheet-input:focus { box-shadow: inset 0 0 0 2px var(--primary); }
+}

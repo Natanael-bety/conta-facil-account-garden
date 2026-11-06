@@ -111,7 +111,7 @@ function Index() {
   const group = (title: string, cls = "") => (
     <tr className="sheet-group">
       <th className={`sheet-label ${cls}`}>{title}</th>
-      <td colSpan={12} className="sheet-cell" />
+      {MONTHS.map((name) => <td key={name} className="sheet-cell" />)}
     </tr>
   );
   const computed = (label: string, fn: (m: number) => number, cls = "") => (

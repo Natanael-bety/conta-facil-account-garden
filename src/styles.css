@@ -182,7 +182,6 @@
   .sheet[data-month="10"] tr > :nth-child(12),
   .sheet[data-month="11"] tr > :nth-child(13) { display: table-cell; }
   .sheet-group th { height: 2.75rem; }
-  .sheet-group td { display: table-cell !important; }
 }
 @media print {
   @page { size: A4 landscape; margin: 8mm; }

@@ -161,3 +161,12 @@
   .sheet-input { width: 100%; height: 100%; padding: 0 0.5rem; text-align: right; background: transparent; outline: none; }
   .sheet-input:focus { box-shadow: inset 0 0 0 2px var(--primary); }
 }
+.sheet-group th, .sheet-group td { background: var(--accent); font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  .sheet { font-size: 7pt; }
+  .sheet-label { min-width: 0; position: static; }
+  .sheet-head { min-width: 0; }
+  .sheet-input { padding: 0 2px; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

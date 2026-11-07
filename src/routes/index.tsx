@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, FileDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileDown, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { DEFAULT_GROUPS, GROUP_TITLES, addAccount, removeAccount, accountTotal, type Row, type Data, type Groups, type GroupId } from "@/lib/accounts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,33 +23,8 @@ export const Route = createFileRoute("/")({
 
 const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
-type Row = { id: string; label: string };
-const EU_INCOME: Row[] = [
-  { id: "salario", label: "salário" },
-  { id: "caixa", label: "caixa nu" },
-  { id: "entrada", label: "valor de entrada" },
-  { id: "lanche", label: "Lanche" },
-];
-const EU_COSTS: Row[] = [
-  { id: "despesa", label: "despesa" },
-  { id: "cartaoPai", label: "Cartão de pai" },
-  { id: "cartao", label: "cartão de credito" },
-  { id: "consorcio", label: "consórcio" },
-  { id: "internet", label: "internet" },
-  { id: "movel", label: "internet móvel" },
-];
-const EMPRESA: Row[] = [
-  { id: "investimentos", label: "investimentos" },
-  { id: "renda", label: "renda bruta" },
-];
-const OUTROS: Row[] = [
-  { id: "suely", label: "suely" },
-  { id: "paula", label: "paula" },
-];
-const TOTAL_ROWS = ["despesa", "cartao", "consorcio", "internet", "movel"];
-
-type Data = Record<string, Record<number, string>>;
 const KEY = "minhas-contas-v1";
+const FIELDS_KEY = "minhas-contas-fields-v1";
 
 const SEED: Data = {
   salario: { 4: "1500", 5: "1500", 6: "1500", 7: "1500", 8: "1500", 9: "1500", 10: "1500", 11: "1500" },
@@ -63,37 +42,53 @@ const SEED: Data = {
   paula: { 4: "101", 5: "120", 6: "173,9", 7: "173,9", 8: "173,9", 9: "102", 10: "101", 11: "102" },
 };
 
-const num = (s?: string) => {
-  if (!s) return 0;
-  const n = parseFloat(s.replace(/\./g, "").replace(",", "."));
-  return isNaN(n) ? 0 : n;
-};
 const fmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function Index() {
   const [data, setData] = useState<Data>(SEED);
   const [loaded, setLoaded] = useState(false);
   const [month, setMonth] = useState(0);
+  const [groups, setGroups] = useState<Groups>(DEFAULT_GROUPS);
+  const [adding, setAdding] = useState<GroupId | null>(null);
+  const [name, setName] = useState("");
+  const [removing, setRemoving] = useState<{ group: GroupId; row: Row } | null>(null);
 
   useEffect(() => {
     setMonth(new Date().getMonth());
-    const raw = localStorage.getItem(KEY);
-    if (raw) setData(JSON.parse(raw));
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) setData(JSON.parse(raw));
+      const fields = localStorage.getItem(FIELDS_KEY);
+      if (fields) {
+        const saved = JSON.parse(fields);
+        if (Object.keys(DEFAULT_GROUPS).every((key) => Array.isArray(saved[key]) && saved[key].every((row: Row) => typeof row.id === "string" && typeof row.label === "string"))) setGroups(saved);
+      }
+    } catch {
+      // Keep the existing defaults if saved browser data is unreadable.
+    }
     setLoaded(true);
   }, []);
   useEffect(() => {
-    if (loaded) localStorage.setItem(KEY, JSON.stringify(data));
-  }, [data, loaded]);
+    if (loaded) {
+      localStorage.setItem(KEY, JSON.stringify(data));
+      localStorage.setItem(FIELDS_KEY, JSON.stringify(groups));
+    }
+  }, [data, groups, loaded]);
 
   const set = (id: string, m: number, v: string) =>
     setData((d) => ({ ...d, [id]: { ...(d[id] || {}), [m]: v } }));
-  const total = (m: number) => TOTAL_ROWS.reduce((s, id) => s + num(data[id]?.[m]), 0);
-  const income = (m: number) => EU_INCOME.reduce((s, r) => s + num(data[r.id]?.[m]), 0);
+  const total = (m: number) => accountTotal(groups.costs, data, m);
+  const income = (m: number) => accountTotal(groups.income, data, m);
 
-  const renderRows = (rows: Row[]) =>
-    rows.map((r) => (
+  const renderRows = (groupId: GroupId) =>
+    groups[groupId].map((r) => (
       <tr key={r.id}>
-        <th className="sheet-label">{r.label}</th>
+        <th className="sheet-label">
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 break-words">{r.label}</span>
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive print:hidden" aria-label={`Remover ${r.label}`} title={`Remover ${r.label}`} onClick={() => setRemoving({ group: groupId, row: r })}><Trash2 className="h-4 w-4" /></Button>
+          </div>
+        </th>
         {MONTHS.map((_, m) => (
           <td key={m} className="sheet-cell">
             <input
@@ -108,9 +103,14 @@ function Index() {
       </tr>
     ));
 
-  const group = (title: string, cls = "") => (
+  const group = (groupId: GroupId, cls = "") => (
     <tr className="sheet-group">
-      <th className={`sheet-label ${cls}`}>{title}</th>
+      <th className={`sheet-label ${cls}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span>{GROUP_TITLES[groupId]}</span>
+          <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 print:hidden" aria-label={`Adicionar campo em ${GROUP_TITLES[groupId]}`} title="Adicionar campo" onClick={() => { setName(""); setAdding(groupId); }}><Plus className="h-5 w-5" /></Button>
+        </div>
+      </th>
       {MONTHS.map((name) => <td key={name} className="sheet-cell" />)}
     </tr>
   );
@@ -171,20 +171,46 @@ function Index() {
             </tr>
           </thead>
           <tbody>
-            {group("EU — Entradas", "text-primary")}
-            {renderRows(EU_INCOME)}
+            {group("income", "text-primary")}
+            {renderRows("income")}
             {computed("total entradas", income, "text-primary")}
-            {group("EU — Gastos", "text-section")}
-            {renderRows(EU_COSTS)}
+            {group("costs", "text-section")}
+            {renderRows("costs")}
             {computed("gasto total", total)}
             {computed("saldo", (m) => income(m) - total(m))}
-            {group("EMPRESA", "text-section")}
-            {renderRows(EMPRESA)}
-            {group("Outros")}
-            {renderRows(OUTROS)}
+            {group("company", "text-section")}
+            {renderRows("company")}
+            {group("others")}
+            {renderRows("others")}
           </tbody>
         </table>
       </div>
+      <Dialog open={adding !== null} onOpenChange={(open) => { if (!open) setAdding(null); }}>
+        <DialogContent className="max-w-[calc(100%-2rem)] rounded-md sm:max-w-md">
+          <DialogHeader><DialogTitle>Adicionar campo</DialogTitle><DialogDescription>{adding ? GROUP_TITLES[adding] : ""}</DialogDescription></DialogHeader>
+          <form className="grid gap-4" onSubmit={(event) => {
+            event.preventDefault();
+            if (!adding || !name.trim()) return;
+            setGroups((current) => addAccount(current, adding, `custom-${crypto.randomUUID()}`, name));
+            setAdding(null);
+          }}>
+            <div className="grid gap-2"><label htmlFor="account-name" className="text-sm font-medium">Nome do campo</label><Input id="account-name" autoFocus maxLength={80} value={name} onChange={(event) => setName(event.target.value)} className="h-11" /></div>
+            <DialogFooter className="gap-2"><Button type="button" variant="outline" className="h-11" onClick={() => setAdding(null)}>Cancelar</Button><Button type="submit" className="h-11" disabled={!name.trim()}><Plus />Adicionar</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }}>
+        <AlertDialogContent className="max-w-[calc(100%-2rem)] rounded-md sm:max-w-md">
+          <AlertDialogHeader><AlertDialogTitle>Remover campo?</AlertDialogTitle><AlertDialogDescription>O campo “{removing?.row.label}” e seus valores de todos os meses serão removidos. Esta ação não pode ser desfeita.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter className="gap-2"><AlertDialogCancel className="h-11">Cancelar</AlertDialogCancel><AlertDialogAction className="h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => {
+            if (!removing) return;
+            const next = removeAccount(groups, data, removing.group, removing.row.id);
+            setGroups(next.groups);
+            setData(next.data);
+            setRemoving(null);
+          }}><Trash2 />Remover</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

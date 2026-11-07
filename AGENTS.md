@@ -31,3 +31,4 @@ use the editor.
 
 ## Presentation
 - Keep one shared account table and use screen-only CSS to show the selected month on mobile; desktop and printed PDF retain every month so editing and calculations stay consistent.
+- Keep editable account groups and their total calculations in a shared browser-safe model; preserve the existing value storage key and store field definitions separately so existing accounts survive the update.

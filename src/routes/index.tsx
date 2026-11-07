@@ -25,6 +25,9 @@ const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "jul
 
 const KEY = "minhas-contas-v1";
 const FIELDS_KEY = "minhas-contas-fields-v1";
+const PROFILES_KEY = "minhas-contas-perfis-v1";
+const CURRENT_KEY = "minhas-contas-atual-v1";
+const OWNER_KEY = "minhas-contas-dono-original-v1";
 
 const SEED: Data = {
   salario: { 4: "1500", 5: "1500", 6: "1500", 7: "1500", 8: "1500", 9: "1500", 10: "1500", 11: "1500" },
@@ -53,27 +56,88 @@ function Index() {
   const [name, setName] = useState("");
   const [removing, setRemoving] = useState<{ group: GroupId; row: Row } | null>(null);
 
+  const [user, setUser] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<string[]>([]);
+  const [loginName, setLoginName] = useState("");
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
     setMonth(new Date().getMonth());
     try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) setData(JSON.parse(raw));
-      const fields = localStorage.getItem(FIELDS_KEY);
+      setProfiles(JSON.parse(localStorage.getItem(PROFILES_KEY) || "[]"));
+      setUser(localStorage.getItem(CURRENT_KEY));
+    } catch {
+      // ignore unreadable data
+    }
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    setLoaded(false);
+    if (!user) return;
+    let owner = localStorage.getItem(OWNER_KEY);
+    if (!owner) { owner = user; localStorage.setItem(OWNER_KEY, user); }
+    const legacy = owner === user;
+    let nextData: Data = legacy ? SEED : {};
+    let nextGroups: Groups = DEFAULT_GROUPS;
+    try {
+      const raw = localStorage.getItem(`${KEY}:${user}`) ?? (legacy ? localStorage.getItem(KEY) : null);
+      if (raw) nextData = JSON.parse(raw);
+      const fields = localStorage.getItem(`${FIELDS_KEY}:${user}`) ?? (legacy ? localStorage.getItem(FIELDS_KEY) : null);
       if (fields) {
         const saved = JSON.parse(fields);
-        if (Object.keys(DEFAULT_GROUPS).every((key) => Array.isArray(saved[key]) && saved[key].every((row: Row) => typeof row.id === "string" && typeof row.label === "string"))) setGroups(saved);
+        if (Object.keys(DEFAULT_GROUPS).every((key) => Array.isArray(saved[key]) && saved[key].every((row: Row) => typeof row.id === "string" && typeof row.label === "string"))) nextGroups = saved;
       }
     } catch {
       // Keep the existing defaults if saved browser data is unreadable.
     }
+    setData(nextData);
+    setGroups(nextGroups);
     setLoaded(true);
-  }, []);
+  }, [user]);
   useEffect(() => {
-    if (loaded) {
-      localStorage.setItem(KEY, JSON.stringify(data));
-      localStorage.setItem(FIELDS_KEY, JSON.stringify(groups));
+    if (loaded && user) {
+      localStorage.setItem(`${KEY}:${user}`, JSON.stringify(data));
+      localStorage.setItem(`${FIELDS_KEY}:${user}`, JSON.stringify(groups));
     }
-  }, [data, groups, loaded]);
+  }, [data, groups, loaded, user]);
+
+  const enter = (n: string) => {
+    const clean = n.trim();
+    if (!clean) return;
+    const next = profiles.includes(clean) ? profiles : [...profiles, clean];
+    setProfiles(next);
+    localStorage.setItem(PROFILES_KEY, JSON.stringify(next));
+    localStorage.setItem(CURRENT_KEY, clean);
+    setLoginName("");
+    setUser(clean);
+  };
+  const logout = () => { localStorage.removeItem(CURRENT_KEY); setUser(null); };
+
+  if (!ready) return <main className="min-h-screen bg-background" />;
+  if (!user) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-background p-4">
+        <div className="w-full max-w-sm rounded-md border border-border bg-card p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="grid h-9 w-9 place-items-center rounded bg-primary font-bold text-primary-foreground">R$</div>
+            <h1 className="text-lg font-semibold text-foreground">Minhas Contas</h1>
+          </div>
+          <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); enter(loginName); }}>
+            <label htmlFor="login-name" className="text-sm font-medium">Seu nome</label>
+            <Input id="login-name" maxLength={40} value={loginName} onChange={(e) => setLoginName(e.target.value)} className="h-11" />
+            <Button type="submit" className="h-11" disabled={!loginName.trim()}>Entrar</Button>
+          </form>
+          {profiles.length > 0 && (
+            <div className="mt-5 grid gap-2">
+              <p className="text-xs text-muted-foreground">Contas salvas neste aparelho</p>
+              {profiles.map((p) => <Button key={p} variant="outline" className="h-11 justify-start" onClick={() => enter(p)}>{p}</Button>)}
+            </div>
+          )}
+        </div>
+      </main>
+    );
+  }
 
   const set = (id: string, m: number, v: string) =>
     setData((d) => ({ ...d, [id]: { ...(d[id] || {}), [m]: v } }));
@@ -131,7 +195,7 @@ function Index() {
           <div className="h-9 w-9 shrink-0 rounded bg-primary text-primary-foreground grid place-items-center font-bold">R$</div>
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold text-foreground">Minhas Contas</h1>
-            <p className="text-xs text-muted-foreground print:hidden">Salvo automaticamente neste navegador</p>
+            <p className="truncate text-xs text-muted-foreground print:hidden">Conta: {user} · <button className="underline" onClick={logout}>trocar</button></p>
           </div>
         </div>
         <Button onClick={() => window.print()} aria-label="Exportar PDF" title="Exportar PDF" className="h-11 shrink-0 px-3 print:hidden">

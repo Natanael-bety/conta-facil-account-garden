@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, FileDown, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AccountEntryDialog } from "@/components/account-entry-dialog";
+import { addEntries, type AccountHistory } from "@/lib/account-entries";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { DEFAULT_GROUPS, GROUP_TITLES, addAccount, removeAccount, accountTotal, type Row, type Data, type Groups, type GroupId } from "@/lib/accounts";
@@ -28,6 +30,7 @@ const FIELDS_KEY = "minhas-contas-fields-v1";
 const PROFILES_KEY = "minhas-contas-perfis-v1";
 const CURRENT_KEY = "minhas-contas-atual-v1";
 const OWNER_KEY = "minhas-contas-dono-original-v1";
+const HISTORY_KEY = "minhas-contas-historico-v1";
 
 const SEED: Data = {
   salario: { 4: "1500", 5: "1500", 6: "1500", 7: "1500", 8: "1500", 9: "1500", 10: "1500", 11: "1500" },
@@ -55,6 +58,8 @@ function Index() {
   const [adding, setAdding] = useState<GroupId | null>(null);
   const [name, setName] = useState("");
   const [removing, setRemoving] = useState<{ group: GroupId; row: Row } | null>(null);
+  const [history, setHistory] = useState<AccountHistory>({});
+  const [editing, setEditing] = useState<{ row: Row; month: number } | null>(null);
 
   const [user, setUser] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<string[]>([]);
@@ -80,9 +85,12 @@ function Index() {
     const legacy = owner === user;
     let nextData: Data = legacy ? SEED : {};
     let nextGroups: Groups = DEFAULT_GROUPS;
+    let nextHistory: AccountHistory = {};
     try {
       const raw = localStorage.getItem(`${KEY}:${user}`) ?? (legacy ? localStorage.getItem(KEY) : null);
       if (raw) nextData = JSON.parse(raw);
+      const savedHistory = localStorage.getItem(`${HISTORY_KEY}:${user}`);
+      if (savedHistory) nextHistory = JSON.parse(savedHistory);
       const fields = localStorage.getItem(`${FIELDS_KEY}:${user}`) ?? (legacy ? localStorage.getItem(FIELDS_KEY) : null);
       if (fields) {
         const saved = JSON.parse(fields);
@@ -93,14 +101,17 @@ function Index() {
     }
     setData(nextData);
     setGroups(nextGroups);
+    setHistory(nextHistory);
+    setEditing(null);
     setLoaded(true);
   }, [user]);
   useEffect(() => {
     if (loaded && user) {
       localStorage.setItem(`${KEY}:${user}`, JSON.stringify(data));
       localStorage.setItem(`${FIELDS_KEY}:${user}`, JSON.stringify(groups));
+      localStorage.setItem(`${HISTORY_KEY}:${user}`, JSON.stringify(history));
     }
-  }, [data, groups, loaded, user]);
+  }, [data, groups, history, loaded, user]);
 
   const enter = (n: string) => {
     const clean = n.trim();
@@ -139,8 +150,6 @@ function Index() {
     );
   }
 
-  const set = (id: string, m: number, v: string) =>
-    setData((d) => ({ ...d, [id]: { ...(d[id] || {}), [m]: v } }));
   const total = (m: number) => accountTotal(groups.costs, data, m);
   const income = (m: number) => accountTotal(groups.income, data, m);
 
@@ -155,13 +164,17 @@ function Index() {
         </th>
         {MONTHS.map((_, m) => (
           <td key={m} className="sheet-cell">
-            <input
-              inputMode="decimal"
-              value={data[r.id]?.[m] ?? ""}
-              onChange={(e) => set(r.id, m, e.target.value)}
-              className="sheet-input"
+            <Button
+              variant="ghost"
+              onClick={() => setEditing({ row: r, month: m })}
+              className="h-11 w-full min-w-0 justify-end rounded-none px-2 font-normal print:hidden"
               aria-label={`${r.label} ${MONTHS[m]}`}
-            />
+              title="Adicionar valores e consultar histórico"
+            >
+              <span className="min-w-0 truncate">{data[r.id]?.[m] ? fmt(Number((data[r.id]?.[m] ?? "").replace(/\./g, "").replace(",", "."))) : ""}</span>
+              <Plus className="shrink-0 text-muted-foreground" />
+            </Button>
+            <span className="hidden px-1 print:block">{data[r.id]?.[m] ?? ""}</span>
           </td>
         ))}
       </tr>
@@ -249,6 +262,25 @@ function Index() {
           </tbody>
         </table>
       </div>
+      {editing && <AccountEntryDialog
+        key={`${editing.row.id}:${editing.month}`}
+        label={editing.row.label}
+        month={MONTHS[editing.month] ?? ""}
+        value={data[editing.row.id]?.[editing.month] ?? ""}
+        history={history[editing.row.id]?.[editing.month]}
+        onClose={() => setEditing(null)}
+        onAdd={(amounts) => {
+          try {
+            const createdAt = new Date().toISOString();
+            const next = addEntries(data, history, editing.row.id, editing.month, amounts.map((cents) => ({ id: crypto.randomUUID(), cents, createdAt })));
+            setData(next.data);
+            setHistory(next.history);
+            return null;
+          } catch {
+            return "O total é muito alto. Confira os valores.";
+          }
+        }}
+      />}
       <Dialog open={adding !== null} onOpenChange={(open) => { if (!open) setAdding(null); }}>
         <DialogContent className="max-w-[calc(100%-2rem)] rounded-md sm:max-w-md">
           <DialogHeader><DialogTitle>Adicionar campo</DialogTitle><DialogDescription>{adding ? GROUP_TITLES[adding] : ""}</DialogDescription></DialogHeader>
@@ -271,6 +303,11 @@ function Index() {
             const next = removeAccount(groups, data, removing.group, removing.row.id);
             setGroups(next.groups);
             setData(next.data);
+            setHistory((current) => {
+              const remaining = { ...current };
+              delete remaining[removing.row.id];
+              return remaining;
+            });
             setRemoving(null);
           }}><Trash2 />Remover</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>

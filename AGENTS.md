@@ -32,3 +32,4 @@ use the editor.
 ## Presentation
 - Keep one shared account table and use screen-only CSS to show the selected month on mobile; desktop and printed PDF retain every month so editing and calculations stay consistent.
 - Keep editable account groups and their total calculations in a shared browser-safe model; preserve the existing value storage key and store field definitions separately so existing accounts survive the update.
+- Keep dated additions in a browser-safe ledger per profile, field, and month alongside the existing values; preserve prior balances without inventing dates and update the shared table totals from the ledger.
